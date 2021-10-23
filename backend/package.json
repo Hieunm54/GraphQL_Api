@@ -1,0 +1,26 @@
+{
+  "name": "node_udemy_course_api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "npm run index.js",
+    "dev": "nodemon run index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Hieunm",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "express-validator": "^6.13.0",
+    "mongoose": "^6.0.10",
+    "multer": "^1.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.13"
+  }
+}
