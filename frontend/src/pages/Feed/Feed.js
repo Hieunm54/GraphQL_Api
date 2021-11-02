@@ -21,8 +21,13 @@ class Feed extends Component {
 		editLoading: false,
 	};
 
+	// mh: load user status o day
 	componentDidMount() {
-		fetch("URL")
+		fetch("http://localhost:8080/user/getStatus",{
+			headers:{
+					Authorization: "Bearer " + this.props.token,
+			}
+		})
 			.then((res) => {
 				if (res.status !== 200) {
 					throw new Error("Failed to fetch user status.");
@@ -76,9 +81,18 @@ class Feed extends Component {
 			.catch(this.catchError);
 	};
 
+	// mh can lam viec o day
 	statusUpdateHandler = (event) => {
 		event.preventDefault();
-		fetch("URL")
+		fetch("http://localhost:8080/user/updateStatus",{
+			method: "PATCH",
+			headers: {
+				Authorization: "Bearer " + this.props.token,
+				"Content-Type": "application/json"
+			},
+			// body: JSON.stringify()
+			body: JSON.stringify({status: this.state.status})
+		})
 			.then((res) => {
 				if (res.status !== 200 && res.status !== 201) {
 					throw new Error("Can't update status!");

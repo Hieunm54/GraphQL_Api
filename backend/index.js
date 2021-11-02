@@ -8,6 +8,8 @@ import dotenv from "dotenv";
 
 import feedRoute from "./routes/feed-routes.js";
 import authRoute from "./routes/auth-routes.js";
+import userRoute from './routes/user-routes.js';
+
 const __dirname = path.resolve();
 
 // multer config
@@ -56,6 +58,7 @@ app.use("/images", express.static(path.join(__dirname, "/images")));
 //config routes
 app.use("/feed", feedRoute);
 app.use('/auth',authRoute);
+app.use('/user',userRoute);
 
 // error handlers
 app.use((errors, req, res, next) => {
