@@ -19,6 +19,9 @@ router.post(
     }),
 	body("password").trim().isLength({ min: 5 }),
 	userController.signup
-);
+); 
+
+router.post('/login', userController.login);
+
 
 export default router;

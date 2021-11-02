@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
-const postModel = new Schema(
+const postSchema = new Schema(
 	{
 		title: {
 			type: String,
@@ -17,10 +17,9 @@ const postModel = new Schema(
 			required: true,
 		},
 		creator: {
-			name: {
-				type: String,
-				required: true,
-			},
+			type: Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
 		},
 	},
 	{
@@ -28,4 +27,4 @@ const postModel = new Schema(
 	}
 );
 
-export default mongoose.model("Post", postModel);
+export default mongoose.model("Post", postSchema);

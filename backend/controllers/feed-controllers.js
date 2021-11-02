@@ -3,6 +3,8 @@ import path from "path";
 
 import { validationResult } from "express-validator";
 import PostModel from "../models/post.js";
+import UserModel from '../models/user.js';
+// import UserController from "./auth-controllers.js";
 
 // const __dirname = path.resolve();	
 
@@ -41,7 +43,7 @@ class Feed {
 	// GET /feed/posts/:id
 	getSinglePost = (req, res, next) => {
 		const id = req.params.id;
-		PostModel.findById(id)
+		PostModel.findById(id).populate('creator')
 			.then((post) => {
 				if (!post) {
 					const error = new Error("Cannot find Post");
@@ -85,16 +87,32 @@ class Feed {
 			title,
 			imgUrl: imgUrl,
 			content,
-			creator: { name: "Harry" },
+			creator: req.userId,
 		});
 
+		let creator;
 		post.save()
 			.then((result) => {
 				console.log(result);
+				return UserModel.findById(req.userId);
+			})
+			.then((user)=>{
+				if( !user){
+					const error = new Error("Cannot find user");
+					error.statusCode = 404;
+					throw error;
+				}
 
+				creator = user;
+				user.posts.push(post);
+				return user.save();
+
+			})
+			.then((result)=>{
 				res.status(201).json({
 					message: "Created successfuly",
 					post: post,
+					creator: {_id : creator._id, name: creator.name},
 				});
 			})
 			.catch((err) => {
@@ -139,6 +157,12 @@ class Feed {
 					error.statusCode = 404;
 					throw error;
 				}
+				if( req.userId.toString() !== post.creator.toString()){
+					const error = new Error("Unauthorized");
+					error.statusCode = 402;
+					throw error;
+				}
+
 
 				if (imgUrl !== post.imgUrl) {
 					clearImage(post.imgUrl);
@@ -173,10 +197,31 @@ class Feed {
 					error.statusCode = 404;
 					throw error;
 				}
+
+				if( req.userId.toString() !== post.creator.toString()){
+					const error = new Error("Unauthorized");
+					error.statusCode = 402;
+					throw error;
+				}
+
 				clearImage(post.imgUrl);
 				return PostModel.findByIdAndDelete(id);
 			})
-			.then(() => {
+			.then( async (docs) => {
+				
+				let user = await UserModel.findById(req.userId);
+				user.posts.pull(id);
+				// console.log('docs: ', docs);	
+
+				// let newPosts = user.posts.filter(p => p.toString() !== docs._id.toString());
+				// console.log('newPosts', newPosts);	
+
+				// user.posts =  newPosts;
+
+				return user.save();
+				
+			})
+			.then(()=>{
 				res.status(200).json({
 					message: "Post deleted successfully",
 				});
