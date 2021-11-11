@@ -3,69 +3,81 @@ import path from "path";
 
 import { validationResult } from "express-validator";
 import PostModel from "../models/post.js";
-import UserModel from '../models/user.js';
-// import UserController from "./auth-controllers.js";
-
-// const __dirname = path.resolve();	
+import UserModel from "../models/user.js";
 
 class Feed {
 	// GET /feed/posts
-	getPost = (req, res, next) => {
+
+	getPost = async (req, res, next) => {
 		const perPage = 3;
 		const currentPage = +req.query.page || 1;
-		console.log('currentPage',currentPage);
-		let totalPage;
+		console.log("currentPage", currentPage);
 
-		PostModel.find({}).countDocuments()
-			.then((number) => {
-				totalPage = number;
-				// console.log('totalPage',totalPage);
+		try {
+			const totalPage = await PostModel.find({}).countDocuments();
+			// let totalPage
+			const posts = await PostModel.find({})
+				.skip((currentPage - 1) * perPage)
+				.limit(perPage);
 
-				return PostModel.find({})
-					.skip((currentPage - 1) * perPage)
-					.limit(perPage)
-					
-			}).then((posts) => {
-				// console.log("posts", posts);
-				res.status(200).json({
-					posts: posts,
-					totalItems: totalPage,
-				});
-			})
-			.catch((err) => {
-				if (!err.statusCode) {
-					err.statusCode = 500;
-				}
-				next(err);
+			res.status(200).json({
+				posts: posts,
+				totalItems: totalPage,
 			});
+		} catch (err) {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		}
 	};
 
 	// GET /feed/posts/:id
-	getSinglePost = (req, res, next) => {
+	getSinglePost = async (req, res, next) => {
 		const id = req.params.id;
-		PostModel.findById(id).populate('creator')
-			.then((post) => {
-				if (!post) {
-					const error = new Error("Cannot find Post");
-					error.statusCode = 404;
-					throw error;
-				}
 
-				res.status(200).json({
-					message: "Fetch post successfuly",
-					post: post,
-				});
-			})
-			.catch((err) => {
-				if (!err.statusCode) {
-					err.statusCode = 500;
-				}
-				next(err);
+		try {
+			const post = await PostModel.findById(id).populate("creator");
+			if (!post) {
+				const error = new Error("Cannot find Post");
+				error.statusCode = 404;
+				throw error;
+			}
+			res.status(200).json({
+				message: "Fetch post successfuly",
+				post: post,
 			});
+		} catch (err) {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		}
+
+		// PostModel.findById(id)
+		// 	.populate("creator")
+		// 	.then((post) => {
+		// 		if (!post) {
+		// 			const error = new Error("Cannot find Post");
+		// 			error.statusCode = 404;
+		// 			throw error;
+		// 		}
+
+		// 		res.status(200).json({
+		// 			message: "Fetch post successfuly",
+		// 			post: post,
+		// 		});
+		// 	})
+		// 	.catch((err) => {
+		// 		if (!err.statusCode) {
+		// 			err.statusCode = 500;
+		// 		}
+		// 		next(err);
+		// 	});
 	};
 
 	// POST /feed/post
-	createPost = (req, res, next) => {
+	createPost = async (req, res, next) => {
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
 			console.log("errors", errors);
@@ -91,39 +103,35 @@ class Feed {
 		});
 
 		let creator;
-		post.save()
-			.then((result) => {
-				console.log(result);
-				return UserModel.findById(req.userId);
-			})
-			.then((user)=>{
-				if( !user){
-					const error = new Error("Cannot find user");
-					error.statusCode = 404;
-					throw error;
-				}
 
-				creator = user;
-				user.posts.push(post);
-				return user.save();
+		try {
+			const result = await post.save();
+			console.log(result);
+			const user = await UserModel.findById(req.userId);
+			if (!user) {
+				const error = new Error("Cannot find user");
+				error.statusCode = 404;
+				throw error;
+			}
 
-			})
-			.then((result)=>{
-				res.status(201).json({
-					message: "Created successfuly",
-					post: post,
-					creator: {_id : creator._id, name: creator.name},
-				});
-			})
-			.catch((err) => {
-				if (!err.statusCode) {
-					err.statusCode = 500;
-				}
-				next(err);
+			creator = user;
+			user.posts.push(post);
+			await user.save();
+
+			res.status(201).json({
+				message: "Created successfuly",
+				post: post,
+				creator: { _id: creator._id, name: creator.name },
 			});
+		} catch (err) {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		}
 	};
 
-	updatePost = (req, res, next) => {
+	updatePost = async (req, res, next) => {
 		// console.log('update ddi')
 
 		const errors = validationResult(req);
@@ -150,88 +158,79 @@ class Feed {
 
 		// console.log('cac ket qua can co: ',title, content, imgUrl);
 		// console.log('postid', postId);
-		PostModel.findById(postId)
-			.then((post) => {
-				if (!post) {
-					const error = new Error("Cannot find Post");
-					error.statusCode = 404;
-					throw error;
-				}
-				if( req.userId.toString() !== post.creator.toString()){
-					const error = new Error("Unauthorized");
-					error.statusCode = 402;
-					throw error;
-				}
+		try {
+			const post = await PostModel.findById(postId);
+			if (!post) {
+				const error = new Error("Cannot find Post");
+				error.statusCode = 404;
+				throw error;
+			}
 
+			if (req.userId.toString() !== post.creator.toString()) {
+				const error = new Error("Unauthorized");
+				error.statusCode = 402;
+				throw error;
+			}
 
-				if (imgUrl !== post.imgUrl) {
-					clearImage(post.imgUrl);
-				}
-				post.title = title;
-				post.content = content;
-				post.imgUrl = imgUrl;
+			if (imgUrl !== post.imgUrl) {
+				clearImage(post.imgUrl);
+			}
+			post.title = title;
+			post.content = content;
+			post.imgUrl = imgUrl;
 
-				return post.save();
-			})
-			.then((result) => {
-				res.status(200).json({
-					message: "Update post successfuly",
-					post: result,
-				});
-			})
-			.catch((err) => {
-				if (!err.statusCode) {
-					err.statusCode = 500;
-				}
-				next(err);
+			const result = await post.save();
+			res.status(200).json({
+				message: "Update post successfuly",
+				post: result,
 			});
+		} catch (err) {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		}
+
+		
 	};
 
-	deletePost = (req, res, next) => {
+	deletePost =  async (req, res, next) => {
 		const id = req.params.id;
+		
+		try {
+			const post = await PostModel.findById(id);
+			if (!post) {
+				const error = new Error("Cannot find Post");
+				error.statusCode = 404;
+				throw error;
+			}
+			if (req.userId.toString() !== post.creator.toString()) {
+				const error = new Error("Unauthorized");
+				error.statusCode = 402;
+				throw error;
+			}
 
-		PostModel.findById(id)
-			.then((post) => {
-				if (!post) {
-					const error = new Error("Cannot find Post");
-					error.statusCode = 404;
-					throw error;
-				}
+			clearImage(post.imgUrl);
+			const result = await PostModel.findByIdAndDelete(id);
 
-				if( req.userId.toString() !== post.creator.toString()){
-					const error = new Error("Unauthorized");
-					error.statusCode = 402;
-					throw error;
-				}
+			let user = await UserModel.findById(req.userId);
+			// let newPosts = user.posts.filter(p => p.toString() !== docs._id.toString());
+			// console.log('newPosts', newPosts);
 
-				clearImage(post.imgUrl);
-				return PostModel.findByIdAndDelete(id);
-			})
-			.then( async (docs) => {
-				
-				let user = await UserModel.findById(req.userId);
-				user.posts.pull(id);
-				// console.log('docs: ', docs);	
+			// to remove elements from arr in mongoose --> use ' pull ' for simplicity
+			user.posts.pull(id);
 
-				// let newPosts = user.posts.filter(p => p.toString() !== docs._id.toString());
-				// console.log('newPosts', newPosts);	
-
-				// user.posts =  newPosts;
-
-				return user.save();
-				
-			})
-			.then(()=>{
-				res.status(200).json({
-					message: "Post deleted successfully",
-				});
-			})
-			.catch((err) => {
-				if (!err.statusCode) {
-					err.statusCode = 500;
-				}
-				next(err);
+			await user.save();
+			res.status(200).json({
+				message: "Post deleted successfully",
 			});
+		} catch (err) {
+			if (!err.statusCode) {
+				err.statusCode = 500;
+			}
+			next(err);
+		}
+		
 	};
 }
 

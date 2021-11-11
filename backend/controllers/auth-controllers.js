@@ -48,6 +48,7 @@ class UserController {
 		
 	};
 
+	// POST /auth/login
 	login = async (req, res, next) => {
 		const email = req.body.email;
 		const password = req.body.password;
