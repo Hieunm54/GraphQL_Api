@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
+import {Server} from 'socket.io';
 
 import feedRoute from "./routes/feed-routes.js";
 import authRoute from "./routes/auth-routes.js";
@@ -75,8 +76,16 @@ app.use((errors, req, res, next) => {
 mongoose
 	.connect(process.env.MONGODB_URL)
 	.then(() => {
-		app.listen(8080, () => {
-			console.log("listening on 8080");
+		const server = app.listen(8080);
+		const io = new Server(server,{
+			cors: {
+					origin: "http://localhost:3000",
+					methods: ["GET", "POST", "PUT", "DELETE"]
+			},
 		});
+		app.set('socketio',io);
+		io.on('connection',socket => {
+			console.log('Client connection established');
+		})
 	})
 	.catch((err) => console.log(err));

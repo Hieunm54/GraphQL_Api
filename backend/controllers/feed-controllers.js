@@ -9,18 +9,20 @@ class Feed {
 	// GET /feed/posts
 
 	getPost = async (req, res, next) => {
-		const perPage = 3;
+		const perPage = 2;
 		const currentPage = +req.query.page || 1;
-		console.log("currentPage", currentPage);
+		// console.log("currentPage", currentPage);
 
 		try {
 			const totalPage = await PostModel.find({}).countDocuments();
 			// let totalPage
 			const posts = await PostModel.find({})
+				.populate('creator')
 				.skip((currentPage - 1) * perPage)
 				.limit(perPage);
 
 			res.status(200).json({
+				message: 'Fetch posts successfully',
 				posts: posts,
 				totalItems: totalPage,
 			});
@@ -86,7 +88,7 @@ class Feed {
 			throw error;
 		}
 		// const image = req.file;
-		console.log("req.file: ", req.file);
+		// console.log("req.file: ", req.file);
 		if (!req.file) {
 			const error = new Error("No image provided");
 			error.statusCode = 422;
@@ -102,11 +104,11 @@ class Feed {
 			creator: req.userId,
 		});
 
-		let creator;
+		// let creator;
 
 		try {
 			const result = await post.save();
-			console.log(result);
+			// console.log(result);
 			const user = await UserModel.findById(req.userId);
 			if (!user) {
 				const error = new Error("Cannot find user");
@@ -114,14 +116,19 @@ class Feed {
 				throw error;
 			}
 
-			creator = user;
+			// creator = user;
 			user.posts.push(post);
 			await user.save();
+
+			// socketio
+			var io = req.app.get('socketio');
+			// console.log("io: ", io);
+			io.emit('posts',{action:'create', post:{...post._doc, creator:{_id: req.userId, name: user.name}}});
 
 			res.status(201).json({
 				message: "Created successfuly",
 				post: post,
-				creator: { _id: creator._id, name: creator.name },
+				creator: { _id: user._id, name: user.name },
 			});
 		} catch (err) {
 			if (!err.statusCode) {
@@ -132,7 +139,6 @@ class Feed {
 	};
 
 	updatePost = async (req, res, next) => {
-		// console.log('update ddi')
 
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
@@ -147,30 +153,37 @@ class Feed {
 		const content = req.body.content;
 		let imgUrl = req.body.image;
 
+		console.log('the con imgUrl o day co ma: ', typeof imgUrl);
+		console.log('req.file: ', req.file);
+
 		if (req.file) {
+			console.log('vao duoc req file ha');
 			imgUrl = req.file.path;
 		}
 		if (!imgUrl) {
+			console.log('loi o anh r')
 			const error = new Error("No image provided");
-			error.statusCode = 404;
+			error.statusCode = 422;
 			throw error;
 		}
 
 		// console.log('cac ket qua can co: ',title, content, imgUrl);
 		// console.log('postid', postId);
 		try {
-			const post = await PostModel.findById(postId);
+			const post = await PostModel.findById(postId).populate('creator');
 			if (!post) {
 				const error = new Error("Cannot find Post");
 				error.statusCode = 404;
 				throw error;
 			}
 
-			if (req.userId.toString() !== post.creator.toString()) {
+			if (req.userId !== post.creator._id.toString()) {
 				const error = new Error("Unauthorized");
 				error.statusCode = 402;
 				throw error;
 			}
+			console.log('post: ', post);
+			console.log('the con imgUrl: ', imgUrl);
 
 			if (imgUrl !== post.imgUrl) {
 				clearImage(post.imgUrl);
@@ -180,6 +193,9 @@ class Feed {
 			post.imgUrl = imgUrl;
 
 			const result = await post.save();
+			//socket connection
+			const io = req.app.get('socketio');
+			io.emit('posts',{action:'update', post: result});
 			res.status(200).json({
 				message: "Update post successfuly",
 				post: result,

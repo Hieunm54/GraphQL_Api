@@ -22,6 +22,7 @@ class Feed extends Component {
 		editLoading: false,
 	};
 
+	// mh: load user status o day
 	componentDidMount() {
 		fetch("http://localhost:8080/user/getStatus", {
 			headers: {
@@ -41,13 +42,11 @@ class Feed extends Component {
 
 		this.loadPosts();
 
-		const socket = openSocket("http://localhost:8080");
+		// socket client connection
+		const socket = openSocket("http://localhost:8080/");
 		socket.on("posts", (data) => {
 			if (data.action === "create") {
 				this.addPost(data.post);
-			} else if (data.action === "update"){
-				this.updatePost(data.post);
-				
 			}
 		});
 	}
@@ -68,21 +67,6 @@ class Feed extends Component {
 		});
 	};
 
-	updatePost = (post) => {
-		this.setState((prevState) => {
-			const updatedPosts = [...prevState.posts];
-			const updatedPostIndex = updatedPosts.findIndex(
-				(p) => p._id === post._id
-			);
-			if (updatedPostIndex > -1) {
-				updatedPosts[updatedPostIndex] = post;
-			}
-			return {
-				posts: updatedPosts,
-			};
-		});
-	};
-
 	loadPosts = (direction) => {
 		if (direction) {
 			this.setState({ postsLoading: true, posts: [] });
@@ -96,7 +80,7 @@ class Feed extends Component {
 			page--;
 			this.setState({ postPage: page });
 		}
-		fetch("http://localhost:8080/feed/posts?page=" + page, {
+		fetch("http://localhost:8080/feed/posts/?page=" + page, {
 			headers: {
 				Authorization: "Bearer " + this.props.token,
 			},
@@ -112,7 +96,7 @@ class Feed extends Component {
 					posts: resData.posts.map((post) => {
 						return {
 							...post,
-							imagePath: post.imageUrl,
+							imagePath: post.imgUrl,
 						};
 					}),
 					totalPosts: resData.totalItems,
@@ -122,6 +106,7 @@ class Feed extends Component {
 			.catch(this.catchError);
 	};
 
+	// mh can lam viec o day
 	statusUpdateHandler = (event) => {
 		event.preventDefault();
 		fetch("http://localhost:8080/user/updateStatus", {
@@ -130,9 +115,8 @@ class Feed extends Component {
 				Authorization: "Bearer " + this.props.token,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({
-				status: this.state.status,
-			}),
+			// body: JSON.stringify()
+			body: JSON.stringify({ status: this.state.status }),
 		})
 			.then((res) => {
 				if (res.status !== 200 && res.status !== 201) {
@@ -185,10 +169,10 @@ class Feed extends Component {
 
 		fetch(url, {
 			method: method,
-			body: formData,
 			headers: {
 				Authorization: "Bearer " + this.props.token,
 			},
+			body: formData,
 		})
 			.then((res) => {
 				if (res.status !== 200 && res.status !== 201) {
@@ -197,27 +181,29 @@ class Feed extends Component {
 				return res.json();
 			})
 			.then((resData) => {
-				console.log(resData);
 				const post = {
 					_id: resData.post._id,
 					title: resData.post.title,
 					content: resData.post.content,
-					creator: resData.post.creator,
+					creator: resData.creator,
+                    //? xem xet
+					// creator: resData.post.creator,
+
 					createdAt: resData.post.createdAt,
 				};
 				this.setState((prevState) => {
-					// let updatedPosts = [...prevState.posts];
-					// if (prevState.editPost) {
-					// 	const postIndex = prevState.posts.findIndex(
-					// 		(p) => p._id === prevState.editPost._id
-					// 	);
-					// 	updatedPosts[postIndex] = post;
-					// }
-					//  else if (prevState.posts.length < 2) {
+					let updatedPosts = [...prevState.posts];
+					if (prevState.editPost) {
+						const postIndex = prevState.posts.findIndex(
+							(p) => p._id === prevState.editPost._id
+						);
+						updatedPosts[postIndex] = post;
+					}
+					// else if (prevState.posts.length < 2) {
 					// 	updatedPosts = prevState.posts.concat(post);
 					// }
 					return {
-						// posts: updatedPosts,
+						posts: updatedPosts,
 						isEditing: false,
 						editPost: null,
 						editLoading: false,
@@ -245,6 +231,7 @@ class Feed extends Component {
 			method: "DELETE",
 			headers: {
 				Authorization: "Bearer " + this.props.token,
+				"Content-Type": "application/json",
 			},
 		})
 			.then((res) => {
@@ -335,6 +322,7 @@ class Feed extends Component {
 									key={post._id}
 									id={post._id}
 									author={post.creator.name}
+									// author={post.name}
 									date={new Date(
 										post.createdAt
 									).toLocaleDateString("en-US")}
