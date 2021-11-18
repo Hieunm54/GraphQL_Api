@@ -17,12 +17,13 @@ class Feed {
 			const totalPage = await PostModel.find({}).countDocuments();
 			// let totalPage
 			const posts = await PostModel.find({})
-				.populate('creator')
+				.populate("creator")
+				.sort({ createdAt: -1 })
 				.skip((currentPage - 1) * perPage)
 				.limit(perPage);
 
 			res.status(200).json({
-				message: 'Fetch posts successfully',
+				message: "Fetch posts successfully",
 				posts: posts,
 				totalItems: totalPage,
 			});
@@ -121,9 +122,15 @@ class Feed {
 			await user.save();
 
 			// socketio
-			var io = req.app.get('socketio');
+			var io = req.app.get("socketio");
 			// console.log("io: ", io);
-			io.emit('posts',{action:'create', post:{...post._doc, creator:{_id: req.userId, name: user.name}}});
+			io.emit("posts", {
+				action: "create",
+				post: {
+					...post._doc,
+					creator: { _id: req.userId, name: user.name },
+				},
+			});
 
 			res.status(201).json({
 				message: "Created successfuly",
@@ -139,7 +146,6 @@ class Feed {
 	};
 
 	updatePost = async (req, res, next) => {
-
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
 			console.log("errors", errors);
@@ -153,24 +159,38 @@ class Feed {
 		const content = req.body.content;
 		let imgUrl = req.body.image;
 
-		console.log('the con imgUrl o day co ma: ', typeof imgUrl);
-		console.log('req.file: ', req.file);
+		console.log("the con imgUrl o day co ma: ", typeof imgUrl);
+		console.log("req.file: ", req.file);
 
 		if (req.file) {
-			console.log('vao duoc req file ha');
+			console.log("vao duoc req file ha");
 			imgUrl = req.file.path;
 		}
 		if (!imgUrl) {
-			console.log('loi o anh r')
+			console.log("loi o anh r");
 			const error = new Error("No image provided");
 			error.statusCode = 422;
 			throw error;
 		}
+		// xu ly viec khong up anh moi -> ô ảnh chuyển thành undefined dạng string
+		if (imgUrl === "undefined") {
+			PostModel.findById(postId)
+				.then((p) => {
+					imgUrl = p.imgUrl;
+				})
+				.catch((err) => {
+					if (!err.statusCode) {
+						err.statusCode = 500;
+					}
+					next(err);
+				});
+		}
+
 
 		// console.log('cac ket qua can co: ',title, content, imgUrl);
 		// console.log('postid', postId);
 		try {
-			const post = await PostModel.findById(postId).populate('creator');
+			const post = await PostModel.findById(postId).populate("creator");
 			if (!post) {
 				const error = new Error("Cannot find Post");
 				error.statusCode = 404;
@@ -182,8 +202,8 @@ class Feed {
 				error.statusCode = 402;
 				throw error;
 			}
-			console.log('post: ', post);
-			console.log('the con imgUrl: ', imgUrl);
+			console.log("post: ", post);
+			console.log("the con imgUrl: ", imgUrl);
 
 			if (imgUrl !== post.imgUrl) {
 				clearImage(post.imgUrl);
@@ -194,8 +214,8 @@ class Feed {
 
 			const result = await post.save();
 			//socket connection
-			const io = req.app.get('socketio');
-			io.emit('posts',{action:'update', post: result});
+			const io = req.app.get("socketio");
+			io.emit("posts", { action: "update", post: result });
 			res.status(200).json({
 				message: "Update post successfuly",
 				post: result,
@@ -206,13 +226,11 @@ class Feed {
 			}
 			next(err);
 		}
-
-		
 	};
 
-	deletePost =  async (req, res, next) => {
+	deletePost = async (req, res, next) => {
 		const id = req.params.id;
-		
+
 		try {
 			const post = await PostModel.findById(id);
 			if (!post) {
@@ -237,6 +255,11 @@ class Feed {
 			user.posts.pull(id);
 
 			await user.save();
+
+			// using socket to delete post on all user
+			var io = req.app.get("socketio");
+			io.emit('posts', {action: 'delete', post: id})
+
 			res.status(200).json({
 				message: "Post deleted successfully",
 			});
@@ -246,7 +269,6 @@ class Feed {
 			}
 			next(err);
 		}
-		
 	};
 }
 
