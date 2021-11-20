@@ -5,11 +5,14 @@ import mongoose from "mongoose";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import {Server} from 'socket.io';
 
-import feedRoute from "./routes/feed-routes.js";
-import authRoute from "./routes/auth-routes.js";
-import userRoute from './routes/user-routes.js';
+import {graphqlHTTP} from 'express-graphql';
+
+import {characterResolver} from './graphQL/resolver.js';
+import {signupResolver} from './graphQL/resolver.js';
+import {characterSchema} from './graphQL/schema.js';
+
+
 
 const __dirname = path.resolve();
 
@@ -49,6 +52,12 @@ dotenv.config();
 // set cors
 app.options('*', cors());
 app.use(cors());
+app.use((req, res, next) => {
+	if(req.method === 'OPTIONS'){
+		return res.sendStatus(200);
+	}
+	next();
+})
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -56,36 +65,44 @@ app.use(express.json());
 // serve static file
 app.use("/images", express.static(path.join(__dirname, "/images")));
 
-//config routes
-app.use("/feed", feedRoute);
-app.use('/auth',authRoute);
-app.use('/user',userRoute);
+
+// using graphql
+app.use('/graphql', graphqlHTTP({
+	schema: characterSchema,
+	rootValue: signupResolver,
+	graphiql: true,
+	// error handler
+	customFormatErrorFn: (err)=>{
+		if(!err.originalError){
+			return err;
+		}
+		const {data,code} = err.originalError
+		const message = err.message || 'An error occurred';
+		return {message: message,data: data, status: code};
+
+	}
+
+}))
 
 // error handlers
-app.use((errors, req, res, next) => {
-	console.log(errors);
-	const { statusCode, message } = errors;
-	if (!statusCode) {
-		statusCode = 500;
-	}
-	const data = errors.data;
-	res.status(statusCode).json({ message, data });
-});
+// app.use((errors, req, res, next) => {
+// 	console.log(errors);
+// 	const { statusCode, message } = errors;
+// 	if (!statusCode) {
+// 		statusCode = 500;
+// 	}
+// 	const data = errors.data;
+// 	res.status(statusCode).json({ message, data });
+// });
 
 // db connection
 mongoose
 	.connect(process.env.MONGODB_URL)
 	.then(() => {
-		const server = app.listen(8080);
-		const io = new Server(server,{
-			cors: {
-					origin: "http://localhost:3000",
-					methods: ["GET", "POST", "PUT", "DELETE"]
-			},
+		console.log();
+		app.listen(8080,()=>{
+			console.log('Server running on port 8080');
 		});
-		app.set('socketio',io);
-		io.on('connection',socket => {
-			console.log('Client connection established');
-		})
+		
 	})
 	.catch((err) => console.log(err));
